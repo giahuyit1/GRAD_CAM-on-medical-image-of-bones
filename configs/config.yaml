@@ -1,0 +1,63 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Cấu hình dự án: Phân loại gãy xương FracAtlas + Grad-CAM
+# ResNet50 backbone | Focal Loss | img_size 1024
+# ─────────────────────────────────────────────────────────────────────────────
+
+paths:
+  results_dir: results/resnet50
+
+data:
+  # COCO JSON annotation (chỉ chứa ảnh gãy)
+  coco_json:         FRACATLAS/Annotations/COCO JSON/COCO_fracture_masks.json
+
+  # Thư mục ảnh
+  fractured_dir:     FRACATLAS/images/Fractured
+  non_fractured_dir: FRACATLAS/images/Non_fractured
+
+  # File split có sẵn của FracAtlas (train/valid/test.csv)
+  # Đặt null nếu muốn tự chia stratified 70/15/15
+  splits_dir: "FRACATLAS/Utilities/Fracture Split"
+
+  # splits.csv tổng hợp sẽ được tạo/đọc ở đây
+  splits_csv: data/splits.csv
+
+  # Kích thước ảnh (nearest power-of-2-friendly size ≈ 1000px)
+  # ResNet50 chuẩn nhận 224, nhưng có thể nhận bất kỳ kích thước nào.
+  # 1024 = 2^10, gần với dải dữ liệu ~300-3000px
+  img_size: 1024
+
+model:
+  name:       resnet50
+  pretrained: true
+
+train:
+  seed:       42
+  batch_size: 8          # Giảm xuống 4 nếu GPU VRAM < 8GB
+  num_workers: 4         # Đặt 0 nếu gặp lỗi multiprocessing trên Windows
+
+  # Warm-up phase (backbone frozen)
+  warmup_epochs: 5
+  lr_warmup:     1.0e-3
+
+  # Fine-tune phase (backbone unfrozen)
+  finetune_epochs: 45
+  lr_finetune:     1.0e-4
+
+  weight_decay:          1.0e-4
+  early_stopping_patience: 10
+
+  # Focal Loss
+  focal_alpha: 0.75      # > 0.5: nhấn mạnh class gãy (minority)
+  focal_gamma: 2.0       # focusing exponent (2.0 = paper gốc)
+
+  # Mixed precision (yêu cầu GPU với tensor cores)
+  use_amp: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Grad-CAM Visualization
+# ─────────────────────────────────────────────────────────────────────────────
+gradcam:
+  method:           "both"          # "gradcam" | "gradcampp" | "both"
+  n_per_group:      null            # null = tất cả; số nguyên = lấy N mẫu mỗi nhóm TP/TN/FP/FN
+  output_dir:       "Grad_cam_MinhHoa"
+  img_size_display: 512             # kích thước mỗi panel (px), ảnh output = 512×(2 hoặc 3) panel
